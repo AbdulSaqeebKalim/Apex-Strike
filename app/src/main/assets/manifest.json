@@ -1,0 +1,26 @@
+{
+  "name": "Apex Strike 2D",
+  "short_name": "ApexStrike",
+  "description": "2D multiplayer top-down shooting game with real-time PeerJS networking and solo vs bots mode.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0e17",
+  "theme_color": "#00e5ff",
+  "categories": ["games", "action", "multiplayer"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

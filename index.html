@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA & Mobile Viewport Configuration -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#00e5ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ApexStrike">
+  <title>Apex Strike 2D - Multiplayer Top-Down Shooter</title>
+
+  <!-- PWA Manifest & Icons: adjust relative paths if deploying to GitHub Pages subpath e.g. /<repo>/manifest.json -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- PeerJS WebRTC Library for Peer-to-Peer Zero-Server Multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <!-- Device Orientation Guard (Mobile Landscape Prompt) -->
+  <div id="rotate-device-overlay" class="hidden">
+    <div class="rotate-card">
+      <div class="rotate-icon-animation">
+        <svg viewBox="0 0 24 24" class="phone-svg">
+          <rect x="5" y="2" width="14" height="20" rx="3" fill="none" stroke="#00e5ff" stroke-width="2"/>
+          <line x1="11" y1="18" x2="13" y2="18" stroke="#00e5ff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="rotate-arrow">↻</span>
+      </div>
+      <h2>ROTATE YOUR DEVICE</h2>
+      <p>Apex Strike 2D is optimized for landscape warfare. Please turn your screen horizontally to enter the combat zone.</p>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="app-container">
+
+    <!-- HOME / PROFILE SCREEN (Loads First) -->
+    <div id="menu-screen" class="screen active">
+      <!-- Background Ambient Glow & Grid -->
+      <div class="menu-bg-grid"></div>
+      <div class="menu-ambient-orb orb-1"></div>
+      <div class="menu-ambient-orb orb-2"></div>
+
+      <!-- Top Header -->
+      <header class="menu-header">
+        <div class="brand-title">
+          <span class="brand-badge">2D TACTICAL</span>
+          <h1>APEX <span class="cyan-glow">STRIKE</span></h1>
+        </div>
+        <div class="header-actions">
+          <button id="btn-install-pwa" class="btn-icon hidden" title="Install Web App">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+            <span class="btn-label">INSTALL</span>
+          </button>
+          <button id="btn-sound-toggle" class="btn-icon" title="Toggle Audio">
+            <span id="sound-icon">🔊</span>
+          </button>
+          <button id="btn-fullscreen" class="btn-icon" title="Toggle Fullscreen">
+            <span>⛶</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Center Stage: Large Centered Character Preview -->
+      <div class="center-stage">
+        <div class="character-preview-container">
+          <!-- Live Canvas rendering idle breathing, weapon equipped, aim laser and skin -->
+          <canvas id="character-preview-canvas" width="280" height="280"></canvas>
+          <div class="preview-pedestal"></div>
+        </div>
+
+        <!-- Editable Callsign / Name -->
+        <div class="player-name-wrapper">
+          <label for="player-name-input">CALLSIGN</label>
+          <div class="name-input-group">
+            <input type="text" id="player-name-input" maxlength="14" value="VIPER-7" spellcheck="false" autocomplete="off">
+            <button id="btn-random-name" title="Randomize Callsign" class="btn-mini">🎲</button>
+          </div>
+        </div>
+
+        <!-- Selected Loadout Quick Indicators -->
+        <div class="loadout-quick-badges">
+          <span id="badge-weapon" class="badge">PISTOL</span>
+          <span id="badge-arena" class="badge">THE COMPOUND</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs (Bottom/Side Tab Bar) -->
+      <nav class="menu-tabs">
+        <button class="tab-btn active" data-tab="play">
+          <span class="tab-icon">⚔️</span>
+          <span class="tab-text">PLAY</span>
+        </button>
+        <button class="tab-btn" data-tab="weapons">
+          <span class="tab-icon">🔫</span>
+          <span class="tab-text">WEAPONS</span>
+        </button>
+        <button class="tab-btn" data-tab="arena">
+          <span class="tab-icon">🗺️</span>
+          <span class="tab-text">ARENA</span>
+        </button>
+        <button class="tab-btn" data-tab="settings">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-text">SETTINGS</span>
+        </button>
+      </nav>
+
+      <!-- TAB CONTENT PANELS -->
+      <main class="tab-panels">
+
+        <!-- TAB 1: PLAY -->
+        <section id="panel-play" class="tab-panel active">
+          <div class="play-modes-grid">
+            
+            <!-- Solo vs Bots Card -->
+            <div class="mode-card solo-card">
+              <div class="mode-card-header">
+                <span class="mode-tag solo">OFFLINE</span>
+                <h3>SOLO VS BOTS</h3>
+              </div>
+              <p class="mode-desc">Sharpen your reflexes against tactical combat drones with configurable difficulty.</p>
+
+              <div class="mode-controls">
+                <div class="control-row">
+                  <label>BOT COUNT</label>
+                  <div class="pill-selector" id="bot-count-selector">
+                    <button class="pill-btn" data-val="1">1</button>
+                    <button class="pill-btn active" data-val="2">2</button>
+                    <button class="pill-btn" data-val="4">4</button>
+                    <button class="pill-btn" data-val="6">6</button>
+                  </div>
+                </div>
+
+                <div class="control-row">
+                  <label>DIFFICULTY</label>
+                  <div class="pill-selector" id="bot-diff-selector">
+                    <button class="pill-btn" data-val="easy">ROOKIE</button>
+                    <button class="pill-btn active" data-val="medium">VETERAN</button>
+                    <button class="pill-btn" data-val="hard">APEX</button>
+                  </div>
+                </div>
+
+                <div class="control-row">
+                  <label>MATCH TARGET</label>
+                  <div class="pill-selector" id="score-target-selector">
+                    <button class="pill-btn" data-val="5">5 KILLS</button>
+                    <button class="pill-btn active" data-val="10">10 KILLS</button>
+                    <button class="pill-btn" data-val="15">15 KILLS</button>
+                  </div>
+                </div>
+              </div>
+
+              <button id="btn-start-solo" class="btn-primary start-btn">
+                <span>DEPLOY SOLO</span>
+                <span class="btn-arrow">▶</span>
+              </button>
+            </div>
+
+            <!-- Multiplayer PeerJS Card -->
+            <div class="mode-card multi-card">
+              <div class="mode-card-header">
+                <span class="mode-tag multi">PEER-TO-PEER</span>
+                <h3>MULTIPLAYER</h3>
+              </div>
+              <p class="mode-desc">Direct WebRTC room syncing up to 8 players. Zero external server required.</p>
+
+              <div class="multi-subtabs">
+                <button class="subtab-btn active" data-sub="host">CREATE ROOM</button>
+                <button class="subtab-btn" data-sub="join">JOIN ROOM</button>
+              </div>
+
+              <!-- Host Subpanel -->
+              <div id="subpanel-host" class="subpanel active">
+                <div class="host-config-section">
+                  <div class="host-field-group">
+                    <label class="host-field-label">SELECT ARENA (HOST CHOICE)</label>
+                    <div class="pill-selector" id="host-arena-selector">
+                      <button class="pill-btn active" data-arena="compound">COMPOUND</button>
+                      <button class="pill-btn" data-arena="citadel">CITADEL</button>
+                      <button class="pill-btn" data-arena="wasteland">WASTELAND</button>
+                    </div>
+                  </div>
+
+                  <div class="host-field-group">
+                    <label class="host-field-label">KILL TARGET (MULTIPLAYER)</label>
+                    <div class="pill-selector" id="multi-target-selector">
+                      <button class="pill-btn" data-val="5">5 KILLS</button>
+                      <button class="pill-btn active" data-val="10">10 KILLS</button>
+                      <button class="pill-btn" data-val="15">15 KILLS</button>
+                      <button class="pill-btn" data-val="0">NO LIMIT (5 MIN)</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="room-action-box">
+                  <button id="btn-create-room" class="btn-secondary">GENERATE ROOM CODE</button>
+                  <div id="host-room-info" class="room-info hidden">
+                    <span class="room-label">ROOM CODE:</span>
+                    <div class="room-code-display">
+                      <strong id="display-room-code">------</strong>
+                      <button id="btn-copy-code" class="btn-copy" title="Copy code">📋</button>
+                    </div>
+                    <div class="host-active-summary">
+                      <span>ARENA: <strong id="host-summary-arena">THE COMPOUND</strong></span>
+                      <span>TARGET: <strong id="host-summary-target">10 KILLS</strong></span>
+                    </div>
+                    <span class="lobby-count" id="lobby-player-count">Players in lobby: 1/8</span>
+                    <div id="host-lobby-list" class="lobby-player-list"></div>
+                    <button id="btn-start-multi" class="btn-primary start-btn" disabled>
+                      <span>START MATCH</span>
+                      <span class="btn-arrow">▶</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Join Subpanel -->
+              <div id="subpanel-join" class="subpanel">
+                <div class="join-action-box">
+                  <div class="join-theater-notice">
+                    <span>🔒 Arena & Target are set by Host upon connecting</span>
+                  </div>
+                  <label for="input-room-code">ENTER ROOM CODE</label>
+                  <input type="text" id="input-room-code" placeholder="e.g. APEX-7492" maxlength="12" uppercase autocomplete="off">
+                  <button id="btn-join-room" class="btn-primary">
+                    <span>CONNECT & JOIN</span>
+                    <span class="btn-arrow">➔</span>
+                  </button>
+                  <div id="join-status-msg" class="status-msg"></div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 2: WEAPONS -->
+        <section id="panel-weapons" class="tab-panel">
+          <div class="panel-inner">
+            <h2 class="panel-title">ARSENAL LOADOUT</h2>
+            <div class="weapons-grid" id="weapons-container">
+              <!-- Dynamically populated by game.js WeaponDatabase -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: ARENA -->
+        <section id="panel-arena" class="tab-panel">
+          <div class="panel-inner">
+            <h2 class="panel-title">COMBAT THEATER</h2>
+            <div id="arena-lock-banner" class="arena-lock-banner hidden">
+              <span class="lock-icon">🔒</span>
+              <span id="arena-lock-text">Arena set by Room Host: <strong id="arena-lock-name">THE COMPOUND</strong>. Joining players inherit host theater.</span>
+            </div>
+            <div class="arenas-grid" id="arenas-container">
+              <!-- Dynamically populated by game.js ArenaDatabase -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS -->
+        <section id="panel-settings" class="tab-panel">
+          <div class="panel-inner settings-box">
+            <h2 class="panel-title">TACTICAL SETTINGS & PROFILE</h2>
+
+            <!-- CAREER STATS SECTION -->
+            <div class="career-stats-card">
+              <div class="career-stats-header">
+                <div class="career-title-group">
+                  <span class="career-badge">TACTICAL DOSSIER</span>
+                  <h3>CAREER STATS</h3>
+                </div>
+                <button id="btn-reset-career" class="btn-mini-danger" title="Reset all lifetime combat records">RESET STATS</button>
+              </div>
+
+              <div class="career-stats-grid">
+                <div class="career-stat-box">
+                  <span class="career-stat-val" id="stat-kills">0</span>
+                  <span class="career-stat-lbl">TOTAL KILLS</span>
+                </div>
+                <div class="career-stat-box">
+                  <span class="career-stat-val" id="stat-deaths">0</span>
+                  <span class="career-stat-lbl">TOTAL DEATHS</span>
+                </div>
+                <div class="career-stat-box highlight-cyan">
+                  <span class="career-stat-val" id="stat-kd">0.00</span>
+                  <span class="career-stat-lbl">K/D RATIO</span>
+                </div>
+                <div class="career-stat-box">
+                  <span class="career-stat-val" id="stat-wins">0</span>
+                  <span class="career-stat-lbl">VICTORIES</span>
+                </div>
+                <div class="career-stat-box">
+                  <span class="career-stat-val" id="stat-losses">0</span>
+                  <span class="career-stat-lbl">DEFEATS</span>
+                </div>
+                <div class="career-stat-box highlight-amber">
+                  <span class="career-stat-val" id="stat-wl">0.00</span>
+                  <span class="career-stat-lbl">WIN / LOSS RATIO</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-list">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-name">SOUND EFFECTS (SFX)</span>
+                  <span class="setting-sub">Web Audio procedural audio</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-sfx" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-name">SCREEN SHAKE</span>
+                  <span class="setting-sub">Camera recoil on weapon fire & explosions</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-shake" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-name">JOYSTICK VIRTUAL SENSITIVITY</span>
+                  <span class="setting-sub">Response curve for analog drag</span>
+                </div>
+                <input type="range" id="setting-sensitivity" min="0.8" max="1.5" step="0.1" value="1.0">
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-name">PLAYER SUIT COLOR</span>
+                  <span class="setting-sub">Armor accent color</span>
+                </div>
+                <div class="color-palette" id="player-color-picker">
+                  <button class="color-swatch active" data-color="#00e5ff" style="--c: #00e5ff"></button>
+                  <button class="color-swatch" data-color="#ff0055" style="--c: #ff0055"></button>
+                  <button class="color-swatch" data-color="#00ff66" style="--c: #00ff66"></button>
+                  <button class="color-swatch" data-color="#ffb700" style="--c: #ffb700"></button>
+                  <button class="color-swatch" data-color="#b026ff" style="--c: #b026ff"></button>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <span class="setting-name">DESKTOP CONTROLS GUIDE</span>
+                  <span class="setting-sub">WASD/Arrows to Move | Mouse to Aim | Click or Space to Shoot</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- IN-GAME SCREEN -->
+    <div id="game-screen" class="screen">
+      <!-- 2D Canvas for High-Performance Hardware-Accelerated Rendering -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- MINIMAL IN-GAME HUD -->
+      <div id="in-game-hud">
+        <!-- Top Left: Pause, Match Info & Circular Minimap -->
+        <div class="hud-top-left">
+          <div class="hud-top-left-row">
+            <button id="btn-pause-game" class="btn-hud-icon" title="Pause / Menu">❚❚</button>
+            <div class="hud-target-indicator">
+              <span class="hud-target-label">FIRST TO:</span>
+              <span id="hud-target-score" class="hud-target-val">10 KILLS</span>
+            </div>
+          </div>
+          <!-- Circular Minimap -->
+          <div id="hud-minimap-container" class="hud-minimap-box" title="Tactical Radar">
+            <canvas id="minimap-canvas" width="86" height="86"></canvas>
+          </div>
+        </div>
+
+        <!-- Top Center: Clean Local Player Health Bar -->
+        <div class="hud-top-center">
+          <div class="hud-hp-card">
+            <div class="hud-hp-header">
+              <span class="hp-label">SHIELD & INTEGRITY</span>
+              <span id="hud-hp-numeric" class="hp-numeric">100 HP</span>
+            </div>
+            <div class="hud-hp-track">
+              <div id="hud-hp-fill" class="hud-hp-bar" style="width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Right: Minimal Kills/Deaths Counter -->
+        <div class="hud-top-right">
+          <div class="hud-score-card">
+            <div class="score-line local">
+              <span class="score-tag">YOU</span>
+              <span id="hud-local-kd" class="score-kd">0K / 0D</span>
+            </div>
+            <div class="hud-target-badge" id="hud-target-badge">First to 10</div>
+            <div class="score-line rival">
+              <span id="hud-rival-label" class="score-tag">RIVAL</span>
+              <span id="hud-rival-kd" class="score-kd">0K / 0D</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kill Feed (Top Right below score) -->
+        <div id="kill-feed" class="kill-feed-container"></div>
+
+        <!-- On-screen Arena & Match Debug Tag (for dev/test verification) -->
+        <div id="debug-arena-tag" class="debug-arena-tag">[ARENA: compound | TARGET: 10 KILLS | ROLE: SOLO]</div>
+
+        <!-- Respawn Countdown Indicator (Shown when dead) -->
+        <div id="respawn-overlay" class="respawn-overlay hidden">
+          <div class="respawn-box">
+            <span class="respawn-title">ELIMINATED</span>
+            <span id="respawn-countdown" class="respawn-timer">3</span>
+            <span class="respawn-hint">REDEPLOYING SHORTLY...</span>
+          </div>
+        </div>
+
+        <!-- TOUCH OVERLAY CONTROLS (Mobile Landscape) -->
+        <div id="touch-controls-overlay">
+          <!-- Left Virtual Joystick: 8-Directional / Analog Movement -->
+          <div id="joystick-left-zone" class="joystick-zone">
+            <div id="joystick-left-base" class="joystick-base">
+              <div id="joystick-left-stick" class="joystick-stick"></div>
+            </div>
+            <span class="joystick-label">MOVE</span>
+          </div>
+
+          <!-- Right Virtual Joystick: Aim & Auto-Shoot -->
+          <div id="joystick-right-zone" class="joystick-zone">
+            <div id="joystick-right-base" class="joystick-base aim-base">
+              <div id="joystick-right-stick" class="joystick-stick aim-stick"></div>
+              <div class="aim-crosshair-icon">✛</div>
+            </div>
+            <span class="joystick-label">AIM & SHOOT</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MATCH SUMMARY / GAME OVER MODAL -->
+      <div id="match-summary-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="summary-header">
+            <h2 id="summary-title" class="victory-text">VICTORY</h2>
+            <p id="summary-subtitle" class="summary-sub">Target Score Achieved</p>
+          </div>
+
+          <!-- Scoreboard Table -->
+          <div class="scoreboard-wrapper">
+            <table class="scoreboard-table">
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>COMBATANT</th>
+                  <th>KILLS</th>
+                  <th>DEATHS</th>
+                  <th>K/D</th>
+                </tr>
+              </thead>
+              <tbody id="scoreboard-body">
+                <!-- Dynamically filled -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="summary-actions">
+            <button id="btn-summary-rematch" class="btn-primary">
+              <span>PLAY AGAIN</span>
+              <span class="btn-arrow">↻</span>
+            </button>
+            <button id="btn-summary-menu" class="btn-secondary">
+              <span>MAIN MENU</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAUSE MODAL -->
+      <div id="pause-modal" class="modal-overlay hidden">
+        <div class="modal-card pause-card">
+          <h2>TACTICAL PAUSE</h2>
+          <div class="pause-actions">
+            <button id="btn-resume-game" class="btn-primary">RESUME COMBAT</button>
+            <button id="btn-pause-sound" class="btn-secondary">TOGGLE AUDIO</button>
+            <button id="btn-quit-match" class="btn-danger">SURRENDER / EXIT</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- WAITING FOR HOST OVERLAY (Multiplayer Client) -->
+      <div id="waiting-host-overlay" class="modal-overlay hidden">
+        <div class="modal-card waiting-card">
+          <div class="radar-pulse-ring"></div>
+          <h2 id="waiting-host-title">WAITING FOR HOST</h2>
+          <p id="waiting-host-desc">Connected to lobby. Awaiting match configuration & start signal from host...</p>
+          <div class="waiting-meta-box">
+            <div class="waiting-meta-row">
+              <span>THEATER:</span>
+              <strong id="waiting-arena-val">INHERITING...</strong>
+            </div>
+            <div class="waiting-meta-row">
+              <span>TARGET:</span>
+              <strong id="waiting-target-val">AWAITING HOST...</strong>
+            </div>
+          </div>
+          <div class="waiting-status-line" id="waiting-host-substatus">Handshake established. Standing by...</div>
+          <div class="summary-actions" style="margin-top:14px;">
+            <button id="btn-cancel-waiting" class="btn-secondary" style="width:100%;">
+              <span>LEAVE ROOM</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container"></div>
+  </div>
+
+  <!-- Main Game Script -->
+  <!-- Relative path works on root or GitHub Pages subpath e.g. /<repo>/game.js -->
+  <script src="./game.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // Relative path to service-worker.js for GitHub Pages support
+        navigator.serviceWorker.register('./service-worker.js')
+          .then((reg) => console.log('PWA ServiceWorker registered successfully:', reg.scope))
+          .catch((err) => console.log('ServiceWorker registration skipped:', err));
+      });
+    }
+
+    // PWA Install Prompt handling
+    let deferredPrompt;
+    const installBtn = document.getElementById('btn-install-pwa');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBtn) {
+        installBtn.classList.remove('hidden');
+      }
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User prompt outcome: ${outcome}`);
+          deferredPrompt = null;
+          installBtn.classList.add('hidden');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

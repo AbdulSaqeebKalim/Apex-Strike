@@ -1,0 +1,8 @@
+{
+  "name": "WebArena P2P Shooter",
+  "description": "A browser-based multiplayer 2D top-down shooter featuring real-time PeerJS combat, customizable loadouts, and seamless cross-platform touch controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
