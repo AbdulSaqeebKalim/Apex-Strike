@@ -2,7 +2,7 @@
 
 A 2D top-down multiplayer/solo shooting game built as a Progressive Web App (PWA). Play on desktop or mobile (landscape mode) with dual joystick controls — move with the left stick, aim and auto-shoot with the right stick.
 
-🎮 **Play now:** [abdulsaqeebkalim.github.io/Apex-Strike-2D-Game](https://abdulsaqeebkalim.github.io/Apex-Strike-2D-Game/)
+🎮 **Play now:** [abdulsaqeebkalim.github.io/Apex-Strike](https://abdulsaqeebkalim.github.io/Apex-Strike/)
 
 ## Features
 
