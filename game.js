@@ -1379,6 +1379,7 @@ class NetworkManager {
     this.peer.on('open', (id) => {
       this.roomCode = id;
       this.isConnected = true;
+      this.game.player.id = id;
       if (onOpen) onOpen(id);
     });
 
@@ -1430,6 +1431,7 @@ class NetworkManager {
     this.game.showWaitingForHostOverlay(`Contacting host at room ${targetRoomCode}...`);
 
     this.peer.on('open', () => {
+      this.game.player.id = this.peer.id;
       const conn = this.peer.connect(targetRoomCode, { reliable: true });
 
       conn.on('open', () => {
