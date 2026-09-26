@@ -2487,7 +2487,6 @@ class ApexGame {
     this.player.x = safeSpawn.x;
     this.player.y = safeSpawn.y;
 
-    this.combatants = [this.player];
     // Snapshot already-known remote players (real name/color/weapon from
     // the lobby 'join' handshake) BEFORE the array gets wiped below.
     const previousRemotes = new Map(
