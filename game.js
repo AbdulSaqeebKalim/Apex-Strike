@@ -1545,7 +1545,11 @@ class NetworkManager {
       if (!this.game.isPlaying) {
         this.game.startMatch('multiplayer');
       }
-    } else if (data.type === 'match_ended') {
+      } else if (data.type === 'host_left' && !this.isHost) {
+      this.game.showToast('Host left the match.');
+      this.game.hideWaitingForHostOverlay();
+      this.game.exitToMenu();
+     } else if (data.type === 'match_ended') {
       // Host declared match over (target reached or time expired)
       let winner = this.game.combatants.find(c => c.id === data.winnerId);
       if (!winner) {
@@ -1681,14 +1685,19 @@ class NetworkManager {
   }
 
   handlePeerDisconnect(peerId) {
-    this.connections.delete(peerId);
-    const idx = this.game.combatants.findIndex(c => c.id === peerId);
-    if (idx !== -1) {
-      const removed = this.game.combatants.splice(idx, 1)[0];
-      this.game.showToast(`${removed.name} left the match.`);
-    }
-    this.updateLobbyDisplay();
+  this.connections.delete(peerId);
+  const idx = this.game.combatants.findIndex(c => c.id === peerId);
+  if (idx !== -1) {
+    const removed = this.game.combatants.splice(idx, 1)[0];
+    this.game.showToast(`${removed.name} left the match.`);
   }
+  this.updateLobbyDisplay();
+
+  if (this.isHost && this.game.isPlaying && this.game.combatants.length <= 1) {
+    const winner = this.game.combatants[0] || this.game.player;
+    this.game.endMatch(winner);
+  }
+}
 
   updateLobbyDisplay() {
     const countEl = document.getElementById('lobby-player-count');
@@ -1990,10 +1999,15 @@ class ApexGame {
     });
 
     document.getElementById('btn-quit-match').addEventListener('click', () => {
-      this.sound.playClick();
-      this.exitToMenu();
-    });
-
+  this.sound.playClick();
+  if (this.matchMode === 'multiplayer' && this.network.isConnected) {
+    if (this.network.isHost) {
+      this.network.broadcast({ type: 'host_left' });
+    }
+    this.network.destroy();
+  }
+  this.exitToMenu();
+});
     // Reset career stats button
     const resetCareerBtn = document.getElementById('btn-reset-career');
     if (resetCareerBtn) {
@@ -2474,6 +2488,13 @@ class ApexGame {
     this.player.y = safeSpawn.y;
 
     this.combatants = [this.player];
+    // Snapshot already-known remote players (real name/color/weapon from
+    // the lobby 'join' handshake) BEFORE the array gets wiped below.
+    const previousRemotes = new Map(
+      this.combatants.filter(c => !c.isLocal && !c.isBot).map(c => [c.id, c])
+    );
+
+    this.combatants = [this.player];
     this.bullets = [];
 
     // Setup Bots if Solo Mode
@@ -2500,15 +2521,19 @@ class ApexGame {
       // Host adds connected peers into the match
       let spawnIndex = 1;
       for (const [peerId, _] of this.network.connections) {
-        let remotePlayer = this.combatants.find(c => c.id === peerId);
+        let remotePlayer = previousRemotes.get(peerId);
         if (!remotePlayer) {
           remotePlayer = new Combatant(peerId, 'Allied Soldier', false, false, '#ff0055');
-          const bSpawn = this.currentArena.spawns[spawnIndex % this.currentArena.spawns.length];
-          remotePlayer.x = bSpawn.x;
-          remotePlayer.y = bSpawn.y;
-          this.combatants.push(remotePlayer);
-          spawnIndex++;
         }
+        remotePlayer.hp = remotePlayer.maxHp;
+        remotePlayer.isDead = false;
+        remotePlayer.kills = 0;
+        remotePlayer.deaths = 0;
+        const bSpawn = this.currentArena.spawns[spawnIndex % this.currentArena.spawns.length];
+        remotePlayer.x = bSpawn.x;
+        remotePlayer.y = bSpawn.y;
+        this.combatants.push(remotePlayer);
+        spawnIndex++;
       }
     }
 
