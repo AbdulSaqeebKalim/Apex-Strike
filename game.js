@@ -1363,6 +1363,8 @@ class NetworkManager {
     this.isConnected = false;
     this.roomCode = null;
     this.syncInterval = null;
+    this.lastMessageTime = new Map(); // host: peerId -> ms timestamp of last data received
+    this.lastHostMessageTime = 0;     // client: ms timestamp of last data received from host
   }
 
   initPeer(onOpen) {
@@ -1393,6 +1395,15 @@ class NetworkManager {
       if (err.type === 'peer-unavailable') {
         const joinMsg = document.getElementById('join-status-msg');
         if (joinMsg) joinMsg.textContent = 'Room code not found or host offline.';
+      }
+    });
+
+    this.peer.on('disconnected', () => {
+      // Lost the signaling server connection (common after the app was
+      // backgrounded) — try to recover instead of dying silently.
+      console.warn('Signaling connection lost — attempting reconnect...');
+      if (this.peer && !this.peer.destroyed) {
+        this.peer.reconnect();
       }
     });
   }
@@ -1469,6 +1480,13 @@ class NetworkManager {
       this.game.hideWaitingForHostOverlay();
       this.game.showToast(`Join failed: ${err.type || 'Host offline'}`);
     });
+
+    this.peer.on('disconnected', () => {
+      console.warn('Signaling connection lost — attempting reconnect...');
+      if (this.peer && !this.peer.destroyed) {
+        this.peer.reconnect();
+      }
+    });
   }
 
   handleIncomingConnection(conn) {
@@ -1503,6 +1521,13 @@ class NetworkManager {
 
   handleNetworkMessage(data, senderPeerId) {
     if (!data) return;
+
+    // Heartbeat: any incoming message proves this connection is still alive.
+    if (this.isHost) {
+      this.lastMessageTime.set(senderPeerId, Date.now());
+    } else {
+      this.lastHostMessageTime = Date.now();
+    }
 
     if (data.type === 'join') {
       // Host adds remote combatant
@@ -1646,6 +1671,29 @@ class NetworkManager {
     // 15 times/sec state sync
     this.syncInterval = setInterval(() => {
       if (!this.game.isPlaying) return;
+
+      const STALE_MS = 6000; // no data for 6s = treat the connection as dead
+      const now = Date.now();
+
+      if (this.isHost) {
+        // Catch clients whose connection silently died (e.g. phone
+        // backgrounded/killed) without PeerJS ever firing 'close'.
+        for (const [peerId, conn] of Array.from(this.connections)) {
+          const last = this.lastMessageTime.get(peerId) || 0;
+          if (last && now - last > STALE_MS) {
+            console.warn(`Peer ${peerId} timed out — dropping.`);
+            this.lastMessageTime.delete(peerId);
+            if (conn.open) conn.close();
+            this.handlePeerDisconnect(peerId);
+          }
+        }
+      } else if (this.lastHostMessageTime && now - this.lastHostMessageTime > STALE_MS) {
+        console.warn('Host connection timed out.');
+        this.lastHostMessageTime = 0;
+        this.game.showToast('Lost connection to host.');
+        this.game.exitToMenu();
+        return;
+      }
 
       if (this.isHost) {
         // Broadcast all combatants state
@@ -1791,6 +1839,16 @@ class ApexGame {
     this.initUI();
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.network.isConnected) {
+        if (this.network.peer && this.network.peer.disconnected && !this.network.peer.destroyed) {
+          console.warn('App resumed — reconnecting to signaling server...');
+          this.network.peer.reconnect();
+        }
+      }
+    });
+    
 
     // Start preview animation loop
     this.startPreviewLoop();
@@ -3013,5 +3071,6 @@ class ApexGame {
 // 10. BOOTSTRAP APPLICATION
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
+  
   window.apexGame = new ApexGame();
 });
